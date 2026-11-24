@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Мой Тайный Санта</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="snowflakes" aria-hidden="true">✦　·　✧　·　✦　·　✧　·　✦</div>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="Мой Тайный Санта">
+          <span class="brand-mark">✦</span>
+          <span>Мой Тайный Санта</span>
+        </a>
+        <div class="profile">
+          <span class="owner-dot"></span>
+          <span id="current-user">Загрузка игры…</span>
+          <button class="icon-button" id="settings-open" aria-label="Настройки">⚙</button>
+        </div>
+      </header>
+
+      <section class="hero" id="top">
+        <div>
+          <p class="eyebrow">Сезон подарков · 2026</p>
+          <h1>Дарить —<br /><em>волшебно.</em></h1>
+          <p class="hero-copy">Зарегистрируйтесь, напишите желание — и Тайный Санта сам проведёт жеребьёвку, когда все места будут заняты.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#join">Присоединиться <span>→</span></a>
+            <a class="button button-quiet" href="#how">Как это работает</a>
+          </div>
+        </div>
+        <div class="gift-card">
+          <div class="ribbon ribbon-v"></div><div class="ribbon ribbon-h"></div>
+          <span class="gift-star">✦</span>
+          <div class="gift-tag">для хороших<br />людей</div>
+        </div>
+      </section>
+
+      <section class="game-overview">
+        <div class="overview-heading">
+          <p class="eyebrow">Ваша игра</p>
+          <h2>Новогодний обмен</h2>
+          <p id="game-status">Регистрация открыта</p>
+        </div>
+        <div class="stat-grid">
+          <article class="stat"><span class="stat-icon">◎</span><strong><span id="participant-count">0</span>/<span id="capacity-display">5</span></strong><small>мест занято</small></article>
+          <article class="stat"><span class="stat-icon">₽</span><strong id="budget-display">2 000</strong><small>лимит на подарок</small></article>
+          <article class="stat"><span class="stat-icon">✦</span><strong>Авто</strong><small>жеребьёвка при заполнении</small></article>
+        </div>
+      </section>
+
+      <section class="content-grid" id="join">
+        <div class="panel participants-panel">
+          <div class="panel-title"><div><p class="eyebrow">Регистрация</p><h2>Кто уже участвует</h2></div><span class="private-badge">без желаний</span></div>
+          <p class="panel-copy">Имена видны всем участникам. Желания и результаты — только назначенным администраторам.</p>
+          <div id="people-list" class="people-list"></div>
+        </div>
+
+        <div class="panel wishes-panel">
+          <div class="panel-title"><div><p class="eyebrow">Твой билет в игру</p><h2>Присоединиться</h2></div><span class="private-badge">🔒 Желание скрыто</span></div>
+          <p class="panel-copy">Укажите своё имя и идею подарка. Когда заполнятся все места, жеребьёвка начнётся автоматически.</p>
+          <form id="join-form" class="join-form">
+            <label>Ваше имя <input id="join-name" required maxlength="32" placeholder="Например, Маша" /></label>
+            <label>Что вы хотите в подарок <input id="join-wish" required maxlength="160" placeholder="Например: книга, свеча, сертификат…" /></label>
+            <button id="join-button" class="button button-dark" type="submit">Зарегистрироваться</button>
+          </form>
+          <p id="registration-message" class="registration-message"></p>
+        </div>
+      </section>
+
+      <section id="my-result" class="panel result-for-me" hidden>
+        <p class="eyebrow">Жеребьёвка завершена</p>
+        <h2>Ваш получатель</h2>
+        <div id="my-result-content"></div>
+      </section>
+
+      <section class="how-it-works" id="how">
+        <p class="eyebrow">Всё под контролем</p>
+        <h2>Просто, честно, секретно</h2>
+        <div class="steps">
+          <article><span>01</span><h3>Каждый регистрируется</h3><p>Участник сам оставляет имя и желание.</p></article>
+          <article><span>02</span><h3>Места заполняются</h3><p>Организатор заранее задаёт нужное число участников.</p></article>
+          <article><span>03</span><h3>Жеребьёвка сама стартует</h3><p>Пары и желания доступны только администраторам.</p></article>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="settings-dialog" class="modal">
+      <form method="dialog" class="modal-card" id="settings-form">
+        <div class="modal-head"><div><p class="eyebrow">Управление игрой</p><h2>Настройки</h2></div><button class="close" value="cancel" aria-label="Закрыть">×</button></div>
+        <label>Лимит на подарок, ₽ <input id="budget-input" type="number" min="100" step="100" value="2000" /></label>
+        <label>Сколько участников должно быть <input id="capacity-input" type="number" min="3" max="100" value="5" /></label>
+        <div class="admin-area"><div><h3>Права создателя и администраторов</h3><p>Создатель назначает администраторов. Создатель и администраторы могут менять число мест и лимит подарка; администраторам также доступны желания и результаты.</p></div><div id="admins-list"></div></div>
+        <div class="modal-actions"><button class="button button-quiet" id="results-open" type="button">Секретные результаты</button><button class="button button-quiet" value="cancel">Отмена</button><button class="button button-primary" value="save">Сохранить изменения</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="setup-dialog" class="modal">
+      <form class="modal-card" id="create-game-form">
+        <div class="modal-head"><div><p class="eyebrow">Начать игру</p><h2>Создать Тайного Санту</h2></div></div>
+        <label>Название игры <input id="game-title-input" maxlength="60" value="Новогодний обмен" /></label>
+        <label>Сколько участников должно быть <input id="new-capacity-input" type="number" min="3" max="100" value="5" required /></label>
+        <label>Лимит на подарок, ₽ <input id="new-budget-input" type="number" min="100" step="100" value="2000" required /></label>
+        <p class="panel-copy">После создания появится ссылка-приглашение. Её можно отправить всем участникам.</p>
+        <div class="modal-actions"><button class="button button-primary" type="submit">Создать игру</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="results-dialog" class="modal results-modal">
+      <div class="modal-card">
+        <div class="modal-head"><div><p class="eyebrow">Секретная информация</p><h2>Результаты жеребьёвки</h2></div><button class="close" id="results-close" aria-label="Закрыть">×</button></div>
+        <p class="results-note">Эта информация доступна только владельцу и администраторам игры.</p>
+        <div id="results-list" class="results-list"></div>
+      </div>
+    </dialog>
+    <div id="toast" class="toast" role="status"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
