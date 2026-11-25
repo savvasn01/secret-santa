@@ -1,21 +1,17 @@
-const $ = (selector) => document.querySelector(selector);
-
+const $ = s => document.querySelector(s);
 const cfg = window.SANTA_CONFIG || {};
-const toast = $('#toast');
 
-let db;
-let user;
-let game;
-let me = null;
-
+let db, user, game, me = null;
 let isOwner = false;
 let isAdmin = false;
 let refreshTimer;
 let realtimeChannel;
 
 function note(message) {
+    const toast = $('#toast');
+
     if (!toast) {
-        console.log(message);
+        alert(message);
         return;
     }
 
@@ -25,11 +21,31 @@ function note(message) {
     clearTimeout(note.timer);
     note.timer = setTimeout(() => {
         toast.classList.remove('show');
-    }, 3500);
+    }, 4000);
 }
 
-function money(value) {
-    return new Intl.NumberFormat('ru-RU').format(value || 0);
+function showError(title, error) {
+    console.error(title, error);
+
+    const message = error?.message ||
+        error?.details ||
+        String(error || 'Неизвестная ошибка');
+
+    alert(`${title}\n\n${message}`);
+}
+
+function money(n) {
+    return new Intl.NumberFormat('ru-RU').format(n || 0);
+}
+
+function escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[c]);
 }
 
 function code() {
@@ -48,7 +64,6 @@ async function session() {
 
     if (!data.session) {
         const result = await db.auth.signInAnonymously();
-
         if (result.error) throw result.error;
     }
 
@@ -66,11 +81,7 @@ async function session() {
 async function getGame() {
     const inviteCode = code();
 
-    if (!inviteCode) {
-        throw new Error('Не указан код игры.');
-    }
-
-    const { data: gameData, error } = await db
+    const { data, error } = await db
         .from('games')
         .select('*')
         .eq('invite_code', inviteCode)
@@ -78,8 +89,7 @@ async function getGame() {
 
     if (error) throw error;
 
-    game = gameData;
-
+    game = data;
     isOwner = game.owner_id === user.id;
 
     const { data: admins, error: adminError } = await db
@@ -120,22 +130,16 @@ async function refresh() {
 
         render(people || []);
 
-        if (game.is_drawn && me) {
-            await ownResult();
-        }
+        if (game.is_drawn && me) await ownResult();
+        if (game.is_drawn && isAdmin) await adminResults();
 
-        if (game.is_drawn && isAdmin) {
-            await adminResults();
-        }
     } catch (error) {
-        console.error(error);
-        note(error.message || 'Не удалось загрузить игру.');
+        showError('Ошибка загрузки игры', error);
     }
 }
 
 function render(people) {
     $('#participant-count').textContent = people.length;
-
     $('#capacity-display').textContent = game.capacity;
     $('#budget-display').textContent = money(game.budget);
 
@@ -147,32 +151,25 @@ function render(people) {
 
     $('#current-user').textContent = isOwner
         ? 'Управление игрой'
-        : isAdmin
-            ? 'Администратор'
-            : 'Участник';
+        : isAdmin ? 'Администратор' : 'Участник';
 
     $('#settings-open').hidden = !isAdmin;
 
     $('#people-list').innerHTML = people.length
-        ? people.map(person => `
+        ? people.map(p => `
             <div class="person">
                 <div class="person-info">
                     <span class="avatar">
-                        ${person.name.split(' ')
-                            .map(part => part[0])
-                            .join('')
-                            .slice(0, 2)}
+                        ${escapeHTML(p.name.split(' ').map(x => x[0]).join('').slice(0, 2))}
                     </span>
-                    <span>${escapeHTML(person.name)}</span>
+                    <span>${escapeHTML(p.name)}</span>
                     ${isAdmin ? '<span class="role">участник</span>' : ''}
                 </div>
             </div>
         `).join('')
         : '<p class="panel-copy">Пока участников нет.</p>';
 
-    const disabled =
-        Boolean(me) ||
-        game.is_drawn ||
+    const disabled = Boolean(me) || game.is_drawn ||
         people.length >= game.capacity;
 
     $('#join-button').disabled = disabled;
@@ -186,16 +183,6 @@ function render(people) {
             : people.length >= game.capacity
                 ? 'Регистрация завершена.'
                 : '';
-}
-
-function escapeHTML(value) {
-    return String(value).replace(/[&<>"']/g, character => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    })[character]);
 }
 
 async function ownResult() {
@@ -232,9 +219,9 @@ async function ownResult() {
 
 async function adminResults() {
     const [
-        { data: pairs, error: pairsError },
-        { data: people, error: peopleError },
-        { data: wishes, error: wishesError }
+        { data: pairs, error: e1 },
+        { data: people, error: e2 },
+        { data: wishes, error: e3 }
     ] = await Promise.all([
         db.from('assignments')
             .select('giver_id,recipient_id')
@@ -249,32 +236,28 @@ async function adminResults() {
             .eq('game_id', game.id)
     ]);
 
-    if (pairsError) throw pairsError;
-    if (peopleError) throw peopleError;
-    if (wishesError) throw wishesError;
+    if (e1) throw e1;
+    if (e2) throw e2;
+    if (e3) throw e3;
 
     const names = Object.fromEntries(
-        (people || []).map(person => [person.id, person.name])
+        (people || []).map(p => [p.id, p.name])
     );
 
     const wishesByPerson = Object.fromEntries(
-        (wishes || []).map(wish => [wish.participant_id, wish.text])
+        (wishes || []).map(w => [w.participant_id, w.text])
     );
 
-    $('#results-list').innerHTML = (pairs || []).map(pair => `
+    $('#results-list').innerHTML = (pairs || []).map(x => `
         <div class="result">
             <div>
-                <strong>${escapeHTML(names[pair.giver_id] || 'Участник')}</strong>
+                <strong>${escapeHTML(names[x.giver_id] || 'Участник')}</strong>
                 <small>дарит подарок</small>
             </div>
-
             <span>→</span>
-
             <div>
-                <strong>${escapeHTML(names[pair.recipient_id] || 'Участник')}</strong>
-                <small>
-                    Желание: ${escapeHTML(wishesByPerson[pair.recipient_id] || '—')}
-                </small>
+                <strong>${escapeHTML(names[x.recipient_id] || 'Участник')}</strong>
+                <small>Желание: ${escapeHTML(wishesByPerson[x.recipient_id] || '—')}</small>
             </div>
         </div>
     `).join('');
@@ -288,9 +271,7 @@ async function join(event) {
     const name = $('#join-name').value.trim();
     const wish = $('#join-wish').value.trim();
 
-    if (!name) {
-        return note('Введите своё имя.');
-    }
+    if (!name) return note('Введите имя.');
 
     const { data: person, error } = await db
         .from('participants')
@@ -302,9 +283,7 @@ async function join(event) {
         .select('id')
         .single();
 
-    if (error) {
-        return note(error.message);
-    }
+    if (error) return showError('Ошибка регистрации', error);
 
     const { error: wishError } = await db
         .from('wishes')
@@ -315,40 +294,43 @@ async function join(event) {
         });
 
     if (wishError) {
-        console.error(wishError);
-        note('Вы зарегистрированы, но желание не сохранилось: ' + wishError.message);
-        await refresh();
-        return;
+        return showError('Не удалось сохранить желание', wishError);
     }
 
-    note('Вы успешно зарегистрированы!');
+    note('Вы зарегистрированы!');
     await refresh();
 }
 
 async function createGame(event) {
     event.preventDefault();
 
+    const button = event.submitter ||
+        $('#create-game-form button[type="submit"]');
+
+    if (button) button.disabled = true;
+
     try {
-        const title =
-            $('#game-title-input').value.trim() || 'Тайный Санта';
+        if (!user) {
+            throw new Error('Пользователь не авторизован.');
+        }
+
+        const title = $('#game-title-input').value.trim() ||
+            'Тайный Санта';
 
         const capacity = Number($('#new-capacity-input').value);
         const budget = Number($('#new-budget-input').value);
 
         if (!Number.isInteger(capacity) || capacity < 2) {
-            return note('Количество участников должно быть не меньше двух.');
+            throw new Error('Количество участников должно быть не меньше двух.');
         }
 
         if (!Number.isFinite(budget) || budget < 0) {
-            return note('Укажите корректный бюджет.');
+            throw new Error('Укажите корректный бюджет.');
         }
 
-        const inviteCode = crypto
-            .getRandomValues(new Uint32Array(2))
-            .map(number => number.toString(36))
-            .join('')
-            .slice(0, 8)
-            .toUpperCase();
+        const inviteCode = crypto.getRandomValues(
+            new Uint32Array(2)
+        ).map(n => n.toString(36)).join('').slice(0, 8).toUpperCase();
 
         const { data, error } = await db
             .from('games')
@@ -364,14 +346,16 @@ async function createGame(event) {
 
         if (error) throw error;
 
-        note('Игра создана!');
+        $('#setup-dialog')?.close();
 
         location.replace(
             `${location.pathname}?game=${encodeURIComponent(data.invite_code)}`
         );
+
     } catch (error) {
-        console.error(error);
-        note(error.message || 'Не удалось создать игру.');
+        showError('Не удалось создать игру', error);
+    } finally {
+        if (button) button.disabled = false;
     }
 }
 
@@ -381,43 +365,35 @@ async function openSettings() {
     $('#budget-input').value = game.budget;
     $('#capacity-input').value = game.capacity;
 
-    const { data: admins, error: adminError } = await db
+    const { data: admins, error: e1 } = await db
         .from('game_admins')
         .select('user_id')
         .eq('game_id', game.id);
 
-    if (adminError) return note(adminError.message);
+    if (e1) return showError('Ошибка загрузки администраторов', e1);
 
-    const ids = new Set((admins || []).map(item => item.user_id));
+    const ids = new Set((admins || []).map(x => x.user_id));
 
-    const { data: people, error } = await db
+    const { data: people, error: e2 } = await db
         .from('participants')
         .select('id,name,user_id')
         .eq('game_id', game.id);
 
-    if (error) return note(error.message);
+    if (e2) return showError('Ошибка загрузки участников', e2);
 
-    $('#admins-list').innerHTML = (people || []).map(person => `
+    $('#admins-list').innerHTML = (people || []).map(p => `
         <div class="admin-person">
-            <span>${escapeHTML(person.name)}</span>
-
-            ${isOwner
-                ? `
-                    <label class="switch">
-                        <input
-                            type="checkbox"
-                            data-admin-user="${person.user_id}"
-                            ${ids.has(person.user_id) ? 'checked' : ''}
-                        />
-                        <span class="slider"></span>
-                    </label>
-                `
-                : ids.has(person.user_id)
-                    ? '<span class="role">админ</span>'
-                    : ''
-            }
+            <span>${escapeHTML(p.name)}</span>
+            ${isOwner ? `
+                <label class="switch">
+                    <input type="checkbox"
+                        data-admin-user="${p.user_id}"
+                        ${ids.has(p.user_id) ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+            ` : (ids.has(p.user_id) ? '<span class="role">админ</span>' : '')}
         </div>
-    `).join('') || '<p class="panel-copy">Пока нет участников.</p>';
+    `).join('') || '<p class="panel-copy">Нет участников.</p>';
 
     $('#settings-dialog').showModal();
 }
@@ -433,11 +409,11 @@ async function saveSettings(event) {
     const budget = Number($('#budget-input').value);
 
     if (!Number.isInteger(capacity) || capacity < 2) {
-        return note('Количество участников должно быть не меньше двух.');
+        return note('Минимум два участника.');
     }
 
     if (!Number.isFinite(budget) || budget < 0) {
-        return note('Укажите корректный бюджет.');
+        return note('Некорректный бюджет.');
     }
 
     const { error } = await db
@@ -445,10 +421,9 @@ async function saveSettings(event) {
         .update({ capacity, budget })
         .eq('id', game.id);
 
-    if (error) return note(error.message);
+    if (error) return showError('Ошибка сохранения настроек', error);
 
     $('#settings-dialog').close();
-
     note('Настройки сохранены.');
 
     await refresh();
@@ -465,10 +440,7 @@ async function setAdmin(event) {
     const checked = input.checked;
 
     const query = checked
-        ? db.from('game_admins').insert({
-            game_id: game.id,
-            user_id
-        })
+        ? db.from('game_admins').insert({ game_id: game.id, user_id })
         : db.from('game_admins')
             .delete()
             .eq('game_id', game.id)
@@ -477,28 +449,22 @@ async function setAdmin(event) {
     const { error } = await query;
 
     if (error) {
-        note(error.message);
         input.checked = !checked;
+        showError('Ошибка изменения администратора', error);
     } else {
-        note(checked
-            ? 'Администратор назначен.'
-            : 'Права администратора сняты.'
-        );
+        note(checked ? 'Администратор назначен.' : 'Администратор снят.');
     }
 }
 
 function subscribe() {
-    if (realtimeChannel) {
-        db.removeChannel(realtimeChannel);
-    }
+    if (realtimeChannel) db.removeChannel(realtimeChannel);
 
     const later = () => {
         clearTimeout(refreshTimer);
         refreshTimer = setTimeout(refresh, 300);
     };
 
-    realtimeChannel = db
-        .channel(`game-${game.id}`)
+    realtimeChannel = db.channel(`game-${game.id}`)
         .on('postgres_changes', {
             event: '*',
             schema: 'public',
@@ -535,7 +501,7 @@ function subscribe() {
 async function init() {
     try {
         if (!cfg.supabaseUrl || !cfg.supabaseAnonKey) {
-            return note('Заполните config.js данными Supabase.');
+            throw new Error('Проверьте config.js и настройки Supabase.');
         }
 
         db = window.supabase.createClient(
@@ -552,23 +518,17 @@ async function init() {
 
         await refresh();
 
-        if (game) {
-            subscribe();
-        }
+        if (game) subscribe();
+
     } catch (error) {
-        console.error(error);
-        note(error.message || 'Ошибка запуска приложения.');
+        showError('Ошибка запуска сайта', error);
     }
 }
 
 $('#join-form')?.addEventListener('submit', join);
-
 $('#create-game-form')?.addEventListener('submit', createGame);
-
 $('#settings-open')?.addEventListener('click', openSettings);
-
 $('#settings-form')?.addEventListener('submit', saveSettings);
-
 $('#admins-list')?.addEventListener('change', setAdmin);
 
 $('#results-open')?.addEventListener('click', () => {
